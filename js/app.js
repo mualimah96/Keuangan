@@ -3,6 +3,8 @@
 // ============================================================
 let currentUser = JSON.parse(localStorage.getItem('ckp_user') || 'null');
 let alokasiCache = [];
+let targetCache = [];
+const $ = id => document.getElementById(id);
 let chartYearly, chartPie, chartDaily, chartTabungan;
 const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
@@ -114,25 +116,41 @@ function enterApp() {
   document.getElementById('view-app').style.display = 'flex';
   document.getElementById('greeting').textContent = `Halo, ${currentUser.nama}! 👋`;
   document.getElementById('user-avatar').textContent = currentUser.nama.charAt(0).toUpperCase();
-  loadPage('dashboard');
+  navigateTo('dashboard');
 }
 
 // ============================================================
 // NAVIGATION
 // ============================================================
 function bindNav() {
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', e => {
-      e.preventDefault();
-      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-      item.classList.add('active');
-      loadPage(item.dataset.page);
-      document.querySelector('.sidebar').classList.remove('open');
-    });
+  document.querySelectorAll('.nav-item, .bn-item[data-page]').forEach(item => {
+    item.addEventListener('click', e => { e.preventDefault(); navigateTo(item.dataset.page); });
   });
-  document.getElementById('btn-menu-mobile').addEventListener('click', () => {
-    document.querySelector('.sidebar').classList.toggle('open');
+  document.querySelectorAll('[data-go]').forEach(b => {
+    b.addEventListener('click', e => { e.preventDefault(); navigateTo(b.dataset.go); });
   });
+  $('bn-akun').addEventListener('click', e => { e.preventDefault(); toggleDrawer(); });
+  $('drawer-backdrop').addEventListener('click', closeDrawer);
+  $('btn-menu-mobile').addEventListener('click', toggleDrawer);
+  $('btn-close-modal').addEventListener('click', closeTargetModal);
+  $('modal-target').addEventListener('click', e => { if (e.target.id === 'modal-target') closeTargetModal(); });
+}
+
+function navigateTo(page) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
+  document.querySelectorAll('.bn-item[data-page]').forEach(n => n.classList.toggle('active', n.dataset.page === page));
+  closeDrawer();
+  loadPage(page);
+  window.scrollTo(0, 0);
+}
+
+function toggleDrawer() {
+  const open = document.querySelector('.sidebar').classList.toggle('open');
+  $('drawer-backdrop').classList.toggle('show', open);
+}
+function closeDrawer() {
+  document.querySelector('.sidebar').classList.remove('open');
+  $('drawer-backdrop').classList.remove('show');
 }
 
 let activePage = 'dashboard';
@@ -164,6 +182,12 @@ async function loadDashboard() {
   document.getElementById('kpi-pemasukan').textContent = formatRupiah(data.totalPemasukanBulan);
   document.getElementById('kpi-pengeluaran').textContent = formatRupiah(data.totalPengeluaranBulan);
   document.getElementById('kpi-tabungan').textContent = formatRupiah(data.totalTabunganBulan);
+
+  const saldo = Number(data.saldoBersih) || 0;
+  $('saldo-bersih').textContent = formatRupiah(saldo);
+  $('saldo-card').classList.toggle('negatif', saldo < 0);
+  renderMobileTarget(data.targetAktif);
+  renderMobileRecent(data.transaksiTerbaru || []);
 
   const ctxY = document.getElementById('chart-yearly');
   if (chartYearly) chartYearly.destroy();
@@ -219,9 +243,11 @@ async function loadPemasukan() {
   showLoading(false);
   if (!data) return;
   const sorted = data.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+  renderPemasukanSummary(sorted);
   const container = document.getElementById('list-pemasukan');
   container.innerHTML = sorted.length ? sorted.map(p => `
     <div class="transaksi-item">
+      <span class="t-icon">${iconSumber(p.sumber)}</span>
       <div class="transaksi-info"><strong>${escapeHtml(p.sumber)}</strong><span>${formatTanggal(p.tanggal)}${p.keterangan ? ' · ' + escapeHtml(p.keterangan) : ''}</span></div>
       <div class="item-actions">
         <span class="transaksi-amount amount-positive">+${formatRupiah(p.nominal)}</span>
@@ -237,6 +263,7 @@ function editPemasukan(p) {
   document.getElementById('pemasukan-sumber').value = p.sumber;
   document.getElementById('pemasukan-nominal').value = p.nominal;
   document.getElementById('pemasukan-keterangan').value = p.keterangan || '';
+  syncSumberChips();
   window.scrollTo(0, 0);
 }
 
@@ -264,7 +291,12 @@ async function loadAlokasi() {
     const cls = persen >= 90 ? 'danger' : persen >= 70 ? 'warn' : '';
     return `
     <div class="alokasi-item">
-      <div class="alokasi-item-top"><strong>${escapeHtml(a.kategori)}</strong><span>${persen}%</span></div>
+      <div class="alokasi-item-top"><strong>${escapeHtml(a.kategori)}</strong>
+        <span class="alokasi-right"><span>${persen}%</span>
+          <button class="btn-icon" onclick="editAlokasi('${a.id}')">✏️</button>
+          <button class="btn-icon" onclick="deleteAlokasi('${a.id}')">🗑️</button>
+        </span>
+      </div>
       <div class="progress-bar"><div class="progress-fill ${cls}" style="width:${Math.min(persen,100)}%"></div></div>
       <div class="alokasi-meta">
         <span>${formatRupiah(a.nominalAlokasi - a.saldoSaatIni)} dari ${formatRupiah(a.nominalAlokasi)}</span>
@@ -272,6 +304,43 @@ async function loadAlokasi() {
       </div>
     </div>`;
   }).join('') : '<p>Belum ada kategori alokasi.</p>';
+}
+
+// ============================================================
+// ALOKASI — EDIT & HAPUS
+// ============================================================
+function resetAlokasiForm() {
+  $('form-alokasi').reset();
+  $('alokasi-id').value = '';
+  $('alokasi-form-title').textContent = 'Tambah Alokasi Baru';
+  $('btn-cancel-alokasi').style.display = 'none';
+}
+
+function editAlokasi(id) {
+  const a = alokasiCache.find(x => x.id === id);
+  if (!a) return;
+  $('alokasi-id').value = a.id;
+  $('alokasi-kategori').value = a.kategori;
+  $('alokasi-nominal').value = a.nominalAlokasi;
+  $('alokasi-tanggal').value = toDateInput(a.tanggal);
+  $('alokasi-form-title').textContent = 'Edit Alokasi';
+  $('btn-cancel-alokasi').style.display = 'block';
+  window.scrollTo(0, 0);
+}
+
+async function deleteAlokasi(id, force = false) {
+  const a = alokasiCache.find(x => x.id === id);
+  if (!a) return;
+  if (!force && !confirm(`Hapus alokasi "${a.kategori}"?`)) return;
+  showLoading(true);
+  const result = await postData('deleteAlokasi', { id, userId: currentUser.userId, force });
+  showLoading(false);
+  if (result.needConfirm) {
+    if (confirm(result.message + '\n\nTetap hapus kategori ini?')) return deleteAlokasi(id, true);
+    return;
+  }
+  showNotif(result.message, result.success ? 'success' : 'error');
+  if (result.success) loadAlokasi();
 }
 
 // ============================================================
@@ -290,9 +359,11 @@ async function loadPengeluaran() {
     sel.innerHTML = alokasi.length
       ? alokasi.map(a => `<option value="${escapeHtml(a.kategori)}">${escapeHtml(a.kategori)}</option>`).join('')
       : '<option value="">Belum ada alokasi — buat dulu di menu Alokasi Dana</option>';
+    renderKategoriChips();
   }
   if (!data) return;
   const sorted = data.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+  renderPengeluaranMobile(sorted);
   const tbody = document.getElementById('list-pengeluaran');
   tbody.innerHTML = sorted.length ? sorted.map(p => `
     <tr>
@@ -312,6 +383,7 @@ function editPengeluaran(p) {
   document.getElementById('pengeluaran-id').value = p.id;
   document.getElementById('pengeluaran-tanggal').value = toDateInput(p.tanggal);
   document.getElementById('pengeluaran-kategori').value = p.kategori;
+  syncKategoriChips();
   document.getElementById('pengeluaran-nominal').value = p.nominal;
   document.getElementById('pengeluaran-deskripsi').value = p.deskripsi || '';
   document.getElementById('pengeluaran-metode').value = p.metode || 'Cash';
@@ -332,7 +404,9 @@ async function deletePengeluaran(id) {
 // ============================================================
 document.getElementById('btn-open-target-form').addEventListener('click', () => {
   const card = document.getElementById('card-target-form');
-  card.style.display = card.style.display === 'none' ? 'block' : 'none';
+  const willShow = card.style.display === 'none';
+  resetTargetForm();
+  if (willShow) card.style.display = 'block';
 });
 
 async function loadTarget() {
@@ -340,22 +414,109 @@ async function loadTarget() {
   const data = await fetchData('getTarget', { userId: currentUser.userId });
   showLoading(false);
   if (!data) return;
+  targetCache = data;
   const container = document.getElementById('list-target');
   container.innerHTML = data.length ? data.map(t => {
     const persen = t.hargaTarget > 0 ? Math.round((t.terkumpul / t.hargaTarget) * 100) : 0;
     const isDone = t.status === 'Done';
     return `
-    <div class="target-card">
-      <div class="target-card-top"><h3 style="margin:0">${escapeHtml(t.namaBarang)}</h3><span class="badge ${isDone ? 'done' : ''}">${isDone ? 'Selesai' : 'Aktif'}</span></div>
+    <div class="target-card" onclick="openTargetDetail('${t.id}')">
+      <div class="target-card-top"><h3 style="margin:0">${escapeHtml(t.namaBarang)}</h3>
+        <div class="card-actions">
+          <span class="badge ${isDone ? 'done' : ''}">${isDone ? 'Selesai' : 'Aktif'}</span>
+          <button class="btn-icon" onclick="event.stopPropagation(); editTarget('${t.id}')">✏️</button>
+          <button class="btn-icon" onclick="event.stopPropagation(); deleteTarget('${t.id}')">🗑️</button>
+        </div>
+      </div>
       <p>${escapeHtml(t.keterangan || '')}</p>
       <div class="target-meta"><span>Terkumpul</span><strong>${formatRupiah(t.terkumpul)}</strong></div>
       <div class="target-meta"><span>Target Harga</span><strong>${formatRupiah(t.hargaTarget)}</strong></div>
       <div class="target-meta"><span>Cicilan/Bulan</span><strong>${formatRupiah(t.cicilanBulan)}</strong></div>
       <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(persen,100)}%"></div></div>
       <div class="target-meta"><span>Progress</span><strong>${persen}%</strong></div>
-      ${!isDone ? `<button class="btn-secondary btn-block" style="margin-top:10px" onclick="promptCicilan('${t.id}')">+ Tambah Cicilan</button>` : `<button class="btn-secondary btn-block" style="margin-top:10px" disabled>✓ Target Tercapai</button>`}
+      ${!isDone ? `<button class="btn-secondary btn-block" style="margin-top:10px" onclick="event.stopPropagation(); promptCicilan('${t.id}')">+ Tambah Cicilan</button>` : `<button class="btn-secondary btn-block" style="margin-top:10px" disabled>✓ Target Tercapai</button>`}
+      <p class="hint">Klik kartu untuk melihat riwayat cicilan</p>
     </div>`;
   }).join('') : '<p>Belum ada target impian. Buat target baru untuk mulai menabung.</p>';
+}
+
+function resetTargetForm() {
+  $('form-target').reset();
+  $('target-id').value = '';
+  $('target-form-title').textContent = 'Buat Target Baru';
+  $('btn-cancel-target').style.display = 'none';
+  $('card-target-form').style.display = 'none';
+}
+
+function editTarget(id) {
+  const t = targetCache.find(x => x.id === id);
+  if (!t) return;
+  $('target-id').value = t.id;
+  $('target-nama').value = t.namaBarang;
+  $('target-harga').value = t.hargaTarget;
+  $('target-cicilan').value = t.cicilanBulan;
+  $('target-selesai').value = toDateInput(t.targetSelesai);
+  $('target-keterangan').value = t.keterangan || '';
+  $('target-form-title').textContent = 'Edit Target';
+  $('btn-cancel-target').style.display = 'block';
+  $('card-target-form').style.display = 'block';
+  window.scrollTo(0, 0);
+}
+
+async function deleteTarget(id) {
+  const t = targetCache.find(x => x.id === id);
+  if (!t) return;
+  if (!confirm(`Hapus target "${t.namaBarang}"?\nSeluruh riwayat cicilannya juga akan ikut terhapus.`)) return;
+  showLoading(true);
+  const result = await postData('deleteTarget', { id, userId: currentUser.userId });
+  showLoading(false);
+  showNotif(result.message, result.success ? 'success' : 'error');
+  if (result.success) loadTarget();
+}
+
+function closeTargetModal() { $('modal-target').style.display = 'none'; }
+
+async function openTargetDetail(id) {
+  const t = targetCache.find(x => x.id === id);
+  if (!t) return;
+  const body = $('modal-target-body');
+  body.innerHTML = '<p>Memuat riwayat cicilan...</p>';
+  $('modal-target').style.display = 'flex';
+
+  const riwayat = await fetchData('getCicilan', { userId: currentUser.userId, targetId: id });
+  if (riwayat === null) { closeTargetModal(); return; }
+
+  const urut = [...riwayat].sort((a, b) => new Date(a.waktu) - new Date(b.waktu));
+  const persen = t.hargaTarget > 0 ? Math.round((t.terkumpul / t.hargaTarget) * 100) : 0;
+  const sisa = Math.max(0, Number(t.hargaTarget) - Number(t.terkumpul));
+  const isDone = t.status === 'Done';
+  const awal = Number(t.terkumpul) - urut.reduce((s, c) => s + Number(c.nominal), 0);
+
+  const items = urut.map((c, i) => `
+    <div class="cicilan-item">
+      <div><strong>Cicilan ke-${i + 1}</strong><span>${formatWaktu(c.waktu)}</span></div>
+      <div class="cicilan-right"><strong class="amount-positive">+${formatRupiah(c.nominal)}</strong><span>Terkumpul: ${formatRupiah(c.terkumpulSetelah)}</span></div>
+    </div>`).reverse();
+  if (awal > 0) {
+    items.push(`
+    <div class="cicilan-item">
+      <div><strong>Saldo awal</strong><span>Sebelum riwayat dicatat</span></div>
+      <div class="cicilan-right"><strong class="amount-positive">+${formatRupiah(awal)}</strong></div>
+    </div>`);
+  }
+
+  body.innerHTML = `
+    <h3 style="margin-right:40px">${escapeHtml(t.namaBarang)} <span class="badge ${isDone ? 'done' : ''}">${isDone ? 'Selesai' : 'Aktif'}</span></h3>
+    <p>${escapeHtml(t.keterangan || '')}</p>
+    <div class="target-meta"><span>Terkumpul</span><strong>${formatRupiah(t.terkumpul)}</strong></div>
+    <div class="target-meta"><span>Target Harga</span><strong>${formatRupiah(t.hargaTarget)}</strong></div>
+    <div class="target-meta"><span>Sisa</span><strong>${formatRupiah(sisa)}</strong></div>
+    <div class="target-meta"><span>Cicilan/Bulan</span><strong>${formatRupiah(t.cicilanBulan)}</strong></div>
+    <div class="target-meta"><span>Target Selesai</span><strong>${t.targetSelesai ? formatTanggal(t.targetSelesai) : '-'}</strong></div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(persen,100)}%"></div></div>
+    <div class="target-meta"><span>Progress</span><strong>${persen}%</strong></div>
+    <h3 style="margin-top:18px">Riwayat Cicilan</h3>
+    <div class="cicilan-list">${items.length ? items.join('') : '<p>Belum ada cicilan yang dicatat.</p>'}</div>`;
 }
 
 async function promptCicilan(targetId) {
@@ -463,7 +624,7 @@ function bindForms() {
     const result = await postData(id ? 'updatePemasukan' : 'addPemasukan', id ? { ...payload, id } : payload);
     showLoading(false);
     showNotif(result.message, result.success ? 'success' : 'error');
-    if (result.success) { e.target.reset(); document.getElementById('pemasukan-id').value = ''; loadPemasukan(); }
+    if (result.success) { e.target.reset(); document.getElementById('pemasukan-id').value = ''; syncSumberChips(); loadPemasukan(); }
   });
 
   document.getElementById('form-alokasi').addEventListener('submit', async e => {
@@ -475,10 +636,11 @@ function bindForms() {
       tanggal: document.getElementById('alokasi-tanggal').value
     };
     showLoading(true);
-    const result = await postData('addAlokasi', payload);
+    const idA = document.getElementById('alokasi-id').value;
+    const result = await postData(idA ? 'updateAlokasi' : 'addAlokasi', idA ? { ...payload, id: idA } : payload);
     showLoading(false);
     showNotif(result.message, result.success ? 'success' : 'error');
-    if (result.success) { e.target.reset(); loadAlokasi(); }
+    if (result.success) { resetAlokasiForm(); loadAlokasi(); }
   });
 
   document.getElementById('form-pengeluaran').addEventListener('submit', async e => {
@@ -511,10 +673,11 @@ function bindForms() {
       keterangan: document.getElementById('target-keterangan').value
     };
     showLoading(true);
-    const result = await postData('addTarget', payload);
+    const idT = document.getElementById('target-id').value;
+    const result = await postData(idT ? 'updateTarget' : 'addTarget', idT ? { ...payload, id: idT } : payload);
     showLoading(false);
     showNotif(result.message, result.success ? 'success' : 'error');
-    if (result.success) { e.target.reset(); document.getElementById('card-target-form').style.display = 'none'; loadTarget(); }
+    if (result.success) { resetTargetForm(); loadTarget(); }
   });
 
   document.getElementById('form-tabungan').addEventListener('submit', async e => {
@@ -531,6 +694,29 @@ function bindForms() {
     showNotif(result.message, result.success ? 'success' : 'error');
     if (result.success) { e.target.reset(); document.getElementById('card-tabungan-form').style.display = 'none'; loadTabungan(); }
   });
+
+  // Tombol batal edit (Alokasi & Target)
+  $('btn-cancel-alokasi').addEventListener('click', resetAlokasiForm);
+  $('btn-cancel-target').addEventListener('click', resetTargetForm);
+
+  // Chip sumber pemasukan (tampilan HP)
+  document.querySelectorAll('#sumber-chips .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const input = $('pemasukan-sumber');
+      const label = input.closest('label');
+      document.querySelectorAll('#sumber-chips .chip').forEach(c => c.classList.toggle('active', c === chip));
+      if (chip.dataset.sumber === '__lain') {
+        input.value = '';
+        label.classList.add('custom-visible');
+        input.focus();
+      } else {
+        input.value = chip.dataset.sumber;
+        label.classList.remove('custom-visible');
+      }
+    });
+  });
+  syncSumberChips();
+  window.matchMedia('(max-width: 900px)').addEventListener('change', syncSumberChips);
 }
 
 // ============================================================
@@ -542,6 +728,134 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 function toDateInput(d) {
+  if (!d) return '';
   const dt = new Date(d);
-  return dt.toISOString().split('T')[0];
+  if (isNaN(dt)) return '';
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${dt.getFullYear()}-${mm}-${dd}`;
+}
+
+// ============================================================
+// HELPER REVISI 1 (tampilan HP, riwayat cicilan)
+// ============================================================
+function isMobile() { return window.matchMedia('(max-width: 900px)').matches; }
+
+function formatWaktu(w) {
+  if (!w) return '-';
+  const d = new Date(w);
+  if (isNaN(d)) return '-';
+  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' +
+         d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+}
+
+function iconKategori(k) {
+  const s = String(k || '').toLowerCase();
+  if (/makan|kuliner|food/.test(s)) return '🍽️';
+  if (/transport|ojek|bensin/.test(s)) return '🚗';
+  if (/belanja|shop/.test(s)) return '🛍️';
+  if (/tagihan|utilitas|listrik/.test(s)) return '⚡';
+  if (/hibur|rekreasi|lifestyle/.test(s)) return '🎬';
+  return '🏷️';
+}
+
+function iconSumber(s) {
+  const v = String(s || '').toLowerCase();
+  if (/gaji/.test(v)) return '💵';
+  if (/freelance|proyek/.test(v)) return '💻';
+  if (/invest|dividen|saham/.test(v)) return '📈';
+  return '🎁';
+}
+
+function renderMobileTarget(t) {
+  const box = $('mobile-target');
+  if (!t) { box.classList.add('is-empty'); return; }
+  box.classList.remove('is-empty');
+  const persen = t.hargaTarget > 0 ? Math.min(100, Math.round((t.terkumpul / t.hargaTarget) * 100)) : 0;
+  box.innerHTML = `
+    <div class="mt-top"><span class="mt-ic">🎯</span>
+      <div class="mt-info"><strong>${escapeHtml(t.namaBarang)}</strong><span>Target: ${formatRupiah(t.hargaTarget)}</span></div>
+      <span class="mt-pct">${persen}%</span></div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${persen}%"></div></div>`;
+}
+
+function renderMobileRecent(list) {
+  $('mobile-recent-list').innerHTML = list.length ? list.map(t => {
+    const masuk = t.jenis === 'pemasukan';
+    return `
+    <div class="transaksi-item">
+      <span class="t-icon ${masuk ? '' : 'out'}">${masuk ? iconSumber(t.judul) : iconKategori(t.kategori)}</span>
+      <div class="transaksi-info"><strong>${escapeHtml(t.judul)}</strong><span>${formatTanggal(t.tanggal)} • ${masuk ? 'Pemasukan' : 'Pengeluaran'}</span></div>
+      <span class="transaksi-amount ${masuk ? 'amount-positive' : 'amount-negative'}">${masuk ? '+' : '-'}${formatRupiah(t.nominal)}</span>
+    </div>`;
+  }).join('') : '<p>Belum ada transaksi.</p>';
+}
+
+function renderPemasukanSummary(list) {
+  const { month, year } = getFilterPeriod();
+  const m = Number(month), y = Number(year);
+  const totalOf = (mm, yy) => list.reduce((s, p) => {
+    const d = new Date(p.tanggal);
+    return (d.getFullYear() === yy && d.getMonth() + 1 === mm) ? s + Number(p.nominal) : s;
+  }, 0);
+  const cur = totalOf(m, y);
+  const prev = totalOf(m === 1 ? 12 : m - 1, m === 1 ? y - 1 : y);
+  $('pemasukan-bulan-total').textContent = formatRupiah(cur);
+  if (prev > 0) {
+    const pct = Math.round(((cur - prev) / prev) * 100);
+    $('pemasukan-bulan-growth').textContent = `${pct >= 0 ? '+' : ''}${pct}% dari bulan lalu`;
+  } else {
+    $('pemasukan-bulan-growth').textContent = 'Belum ada data bulan lalu';
+  }
+  $('pemasukan-bulan-bar').style.width = (prev > 0 ? Math.min(100, Math.round((cur / prev) * 100)) : (cur > 0 ? 100 : 0)) + '%';
+}
+
+function syncSumberChips() {
+  const input = $('pemasukan-sumber');
+  const label = input.closest('label');
+  if (!input.value && isMobile()) input.value = 'Gaji Utama';
+  const v = input.value;
+  const known = ['Gaji Utama', 'Freelance', 'Investasi'];
+  const custom = !!v && !known.includes(v);
+  document.querySelectorAll('#sumber-chips .chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.sumber === v || (c.dataset.sumber === '__lain' && custom));
+  });
+  label.classList.toggle('custom-visible', custom);
+}
+
+function renderKategoriChips() {
+  const box = $('kategori-chips');
+  box.innerHTML = '';
+  if (!alokasiCache.length) {
+    box.innerHTML = '<p class="chips-empty">Belum ada alokasi — buat dulu di menu Alokasi Dana.</p>';
+    return;
+  }
+  alokasiCache.forEach(a => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip';
+    b.dataset.kategori = a.kategori;
+    b.innerHTML = `<span class="chip-ic">${iconKategori(a.kategori)}</span>${escapeHtml(a.kategori)}`;
+    b.addEventListener('click', () => { $('pengeluaran-kategori').value = a.kategori; syncKategoriChips(); });
+    box.appendChild(b);
+  });
+  syncKategoriChips();
+}
+
+function syncKategoriChips() {
+  const v = $('pengeluaran-kategori').value;
+  document.querySelectorAll('#kategori-chips .chip').forEach(c => c.classList.toggle('active', c.dataset.kategori === v));
+}
+
+function renderPengeluaranMobile(list) {
+  $('list-pengeluaran-m').innerHTML = list.length ? list.map(p => `
+    <div class="transaksi-item">
+      <span class="t-icon out">${iconKategori(p.kategori)}</span>
+      <div class="transaksi-info"><strong>${escapeHtml(p.deskripsi || p.kategori)}</strong><span>${escapeHtml(p.metode || '-')} • ${formatTanggal(p.tanggal)}</span></div>
+      <div class="item-actions">
+        <span class="transaksi-amount amount-negative">-${formatRupiah(p.nominal)}</span>
+        <button class="btn-icon" onclick='editPengeluaran(${JSON.stringify(p)})'>✏️</button>
+        <button class="btn-icon" onclick="deletePengeluaran('${p.id}')">🗑️</button>
+      </div>
+    </div>`).join('') : '<p>Belum ada catatan pengeluaran.</p>';
 }

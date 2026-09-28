@@ -69,6 +69,7 @@
 
   <main class="main-content">
     <header class="topbar">
+      <span class="mobile-brand mobile-only">Catatan Keuangan</span>
       <h2 id="greeting">Halo, Selamat Datang!</h2>
       <div class="topbar-right">
         <div class="month-select">
@@ -88,6 +89,12 @@
         <h1>Dashboard</h1>
         <p>Ringkasan keuangan Anda bulan ini.</p>
       </div>
+      <h1 class="m-title mobile-only">Keuangan Bulan Ini</h1>
+      <div class="saldo-card" id="saldo-card">
+        <div class="saldo-top"><span>TOTAL SALDO BERSIH</span><span class="saldo-icon">💰</span></div>
+        <div class="saldo-value" id="saldo-bersih">Rp 0</div>
+        <div class="saldo-sub">Sisa uang Anda saat ini · akumulasi semua waktu (Pemasukan − Pengeluaran − Tabungan)</div>
+      </div>
       <div class="kpi-row">
         <div class="kpi-card kpi-primary">
           <div class="kpi-top"><span>Total Pemasukan</span><span class="kpi-icon">↑</span></div>
@@ -101,6 +108,17 @@
           <div class="kpi-top"><span>Total Tabungan</span><span class="kpi-icon kpi-icon-green">🐷</span></div>
           <div class="kpi-value" id="kpi-tabungan">Rp 0</div>
         </div>
+      </div>
+      <div class="quick-actions mobile-only">
+        <button type="button" data-go="pemasukan"><span class="qa-ic">💳</span>Masuk</button>
+        <button type="button" data-go="pengeluaran"><span class="qa-ic">🧾</span>Keluar</button>
+        <button type="button" data-go="target"><span class="qa-ic">🎯</span>Target</button>
+        <button type="button" data-go="laporan"><span class="qa-ic">📊</span>Laporan</button>
+      </div>
+      <div class="mobile-target mobile-only is-empty" id="mobile-target"></div>
+      <div class="mobile-only">
+        <div class="mobile-recent-head"><h3>Transaksi Terbaru</h3><a href="#" data-go="laporan">Lihat Semua</a></div>
+        <div class="list-transaksi" id="mobile-recent-list"></div>
       </div>
       <div class="grid-2">
         <div class="card">
@@ -126,14 +144,29 @@
     <!-- ===== CATAT PEMASUKAN ===== -->
     <section id="page-pemasukan" class="page" style="display:none">
       <div class="page-head"><h1>Catat Pemasukan</h1><p>Tambah pemasukan baru dan kelola catatan finansial Anda.</p></div>
+      <div class="summary-dark mobile-only">
+        <div class="summary-top"><span>TOTAL PEMASUKAN BULAN INI</span><span class="kpi-icon">↗</span></div>
+        <div class="summary-value" id="pemasukan-bulan-total">Rp 0</div>
+        <div class="summary-sub" id="pemasukan-bulan-growth"></div>
+        <div class="progress-bar"><div class="progress-fill" id="pemasukan-bulan-bar" style="width:0%"></div></div>
+      </div>
       <div class="grid-2">
         <div class="card">
           <h3>Tambah Pemasukan</h3>
           <form id="form-pemasukan" class="form-grid">
             <input type="hidden" id="pemasukan-id">
             <label>Tanggal<input type="date" id="pemasukan-tanggal" required></label>
-            <label>Sumber Pemasukan<input type="text" id="pemasukan-sumber" placeholder="cth: Gaji Bulanan" required></label>
-            <label>Jumlah Nominal (Rp)<input type="number" id="pemasukan-nominal" min="0" required></label>
+            <div class="chips-block mobile-only">
+              <span class="chips-label">Sumber Pemasukan</span>
+              <div class="chips chips-2" id="sumber-chips">
+                <button type="button" class="chip" data-sumber="Gaji Utama"><span class="chip-ic">💵</span>Gaji Utama</button>
+                <button type="button" class="chip" data-sumber="Freelance"><span class="chip-ic">💻</span>Freelance</button>
+                <button type="button" class="chip" data-sumber="Investasi"><span class="chip-ic">📈</span>Investasi</button>
+                <button type="button" class="chip" data-sumber="__lain"><span class="chip-ic">🎁</span>Hadiah / Lain</button>
+              </div>
+            </div>
+            <label class="f-sumber">Sumber Pemasukan<input type="text" id="pemasukan-sumber" placeholder="cth: Gaji Bulanan" required></label>
+            <label>Jumlah Nominal (Rp)<div class="input-rp"><span class="rp-prefix">Rp</span><input type="number" id="pemasukan-nominal" min="0" required></div></label>
             <label>Catatan (opsional)<textarea id="pemasukan-keterangan" rows="2"></textarea></label>
             <button type="submit" class="btn-primary btn-block">✓ Simpan Pemasukan</button>
           </form>
@@ -150,12 +183,14 @@
       <div class="page-head"><h1>Alokasi Dana</h1><p>Kelola dan pantau batas pengeluaran kategori bulanan Anda.</p></div>
       <div class="grid-2">
         <div class="card">
-          <h3>Tambah Alokasi Baru</h3>
+          <h3 id="alokasi-form-title">Tambah Alokasi Baru</h3>
           <form id="form-alokasi" class="form-grid">
+            <input type="hidden" id="alokasi-id">
             <label>Nama Kategori<input type="text" id="alokasi-kategori" placeholder="cth: Kebutuhan Rumah" required></label>
             <label>Jumlah Alokasi (Rp)<input type="number" id="alokasi-nominal" min="0" required></label>
             <label>Tanggal Efektif<input type="date" id="alokasi-tanggal" required></label>
             <button type="submit" class="btn-primary btn-block">✓ Simpan Alokasi</button>
+            <button type="button" class="btn-secondary btn-block" id="btn-cancel-alokasi" style="display:none">Batal Edit</button>
           </form>
         </div>
         <div class="card">
@@ -171,11 +206,12 @@
       <div class="card">
         <form id="form-pengeluaran" class="form-grid form-grid-wide">
           <input type="hidden" id="pengeluaran-id">
-          <label>Kategori<select id="pengeluaran-kategori" required></select></label>
-          <label>Tanggal<input type="date" id="pengeluaran-tanggal" required></label>
-          <label>Jumlah Nominal (Rp)<input type="number" id="pengeluaran-nominal" min="0" required></label>
-          <label>Deskripsi<input type="text" id="pengeluaran-deskripsi" placeholder="cth: Belanja bulanan"></label>
-          <label>Metode Pembayaran
+          <label class="f-kategori">Kategori<select id="pengeluaran-kategori" required></select></label>
+          <label class="f-tanggal">Tanggal<input type="date" id="pengeluaran-tanggal" required></label>
+          <label class="f-nominal">Jumlah Nominal (Rp)<div class="input-rp"><span class="rp-prefix">Rp</span><input type="number" id="pengeluaran-nominal" min="0" required></div></label>
+          <div class="chips-block mobile-only f-chips"><span class="chips-label">Kategori</span><div class="chips chips-4" id="kategori-chips"></div></div>
+          <label class="f-deskripsi">Deskripsi<input type="text" id="pengeluaran-deskripsi" placeholder="cth: Belanja bulanan"></label>
+          <label class="f-metode">Metode Pembayaran
             <select id="pengeluaran-metode">
               <option>Cash</option><option>Bank Transfer</option><option>QRIS</option><option>Kartu Debit/Kredit</option>
             </select>
@@ -183,9 +219,11 @@
           <button type="submit" class="btn-primary">+ Simpan Pengeluaran</button>
         </form>
       </div>
-      <div class="card">
-        <h3>Riwayat Pengeluaran</h3>
-        <div class="table-wrap">
+      <div class="card history-card">
+        <h3 class="desktop-only">Riwayat Pengeluaran</h3>
+        <h3 class="mobile-only">Pengeluaran Terbaru</h3>
+        <div id="list-pengeluaran-m" class="list-transaksi mobile-only"></div>
+        <div class="table-wrap desktop-only">
           <table class="data-table">
             <thead><tr><th>Tanggal</th><th>Kategori</th><th>Deskripsi</th><th>Metode</th><th>Nominal</th><th>Aksi</th></tr></thead>
             <tbody id="list-pengeluaran"></tbody>
@@ -201,14 +239,16 @@
         <button class="btn-primary" id="btn-open-target-form">+ Target Baru</button>
       </div>
       <div class="card" id="card-target-form" style="display:none">
-        <h3>Buat Target Baru</h3>
+        <h3 id="target-form-title">Buat Target Baru</h3>
         <form id="form-target" class="form-grid">
+          <input type="hidden" id="target-id">
           <label>Nama Barang<input type="text" id="target-nama" required></label>
           <label>Harga Target (Rp)<input type="number" id="target-harga" min="0" required></label>
           <label>Cicilan per Bulan (Rp)<input type="number" id="target-cicilan" min="0" required></label>
           <label>Target Selesai<input type="date" id="target-selesai"></label>
           <label>Keterangan<input type="text" id="target-keterangan"></label>
           <button type="submit" class="btn-primary btn-block">✓ Simpan Target</button>
+          <button type="button" class="btn-secondary btn-block" id="btn-cancel-target" style="display:none">Batal Edit</button>
         </form>
       </div>
       <div id="list-target" class="target-grid"></div>
@@ -268,6 +308,22 @@
     </section>
 
   </main>
+
+  <div id="modal-target" class="modal" style="display:none">
+    <div class="modal-box">
+      <button type="button" class="modal-close" id="btn-close-modal">✕</button>
+      <div id="modal-target-body"></div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="#" class="bn-item active" data-page="dashboard"><span>📊</span>Dashboard</a>
+    <a href="#" class="bn-item" data-page="pemasukan"><span>⬇️</span>Pemasukan</a>
+    <a href="#" class="bn-item" data-page="pengeluaran"><span>⬆️</span>Pengeluaran</a>
+    <a href="#" class="bn-item" data-page="tabungan"><span>🐷</span>Tabungan</a>
+    <a href="#" class="bn-item" id="bn-akun"><span>👤</span>Akun</a>
+  </nav>
+  <div id="drawer-backdrop" class="drawer-backdrop"></div>
 </div>
 
 <script src="js/config.js"></script>
