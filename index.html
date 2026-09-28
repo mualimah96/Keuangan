@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CatatanKeu — Catatan Keuangan Personal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+
+<!-- ============ AUTH SCREEN ============ -->
+<div id="view-auth" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">💰</div>
+    <p class="auth-eyebrow">CATATAN KEUANGAN PERSONAL</p>
+    <h1 id="auth-title">Selamat datang kembali</h1>
+
+    <form id="form-login" class="auth-form">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="nama@email.com" required>
+      <label>Kata Sandi</label>
+      <input type="password" id="login-password" placeholder="••••••••" required>
+      <button type="submit" class="btn-primary btn-block">Masuk</button>
+    </form>
+
+    <form id="form-register" class="auth-form" style="display:none">
+      <label>Nama Lengkap</label>
+      <input type="text" id="reg-nama" placeholder="Nama Anda" required>
+      <label>Email</label>
+      <input type="email" id="reg-email" placeholder="nama@email.com" required>
+      <label>Kata Sandi</label>
+      <input type="password" id="reg-password" placeholder="Minimal 6 karakter" required minlength="6">
+      <button type="submit" class="btn-primary btn-block">Daftar</button>
+    </form>
+
+    <p class="auth-switch">
+      <span id="switch-to-register">Belum punya akun? <a href="#">Daftar di sini</a></span>
+      <span id="switch-to-login" style="display:none">Sudah punya akun? <a href="#">Masuk di sini</a></span>
+    </p>
+  </div>
+</div>
+
+<!-- ============ MAIN APP ============ -->
+<div id="view-app" class="app-shell" style="display:none">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">💰</span>
+      <span class="brand-name">CatatanKeu</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="dashboard">📊 Dashboard</a>
+      <a href="#" class="nav-item" data-page="pemasukan">➕ Catat Pemasukan</a>
+      <a href="#" class="nav-item" data-page="alokasi">🧭 Alokasi Dana</a>
+      <a href="#" class="nav-item" data-page="pengeluaran">➖ Catat Pengeluaran</a>
+      <a href="#" class="nav-item" data-page="target">🚩 Target Impian</a>
+      <a href="#" class="nav-item" data-page="tabungan">🐷 Tabungan</a>
+      <a href="#" class="nav-item" data-page="laporan">📄 Laporan Bulanan</a>
+    </nav>
+    <a href="#" id="btn-logout" class="sidebar-logout">↩ Logout</a>
+  </aside>
+
+  <button id="btn-menu-mobile" class="btn-menu-mobile">☰</button>
+
+  <main class="main-content">
+    <header class="topbar">
+      <h2 id="greeting">Halo, Selamat Datang!</h2>
+      <div class="topbar-right">
+        <div class="month-select">
+          <select id="filter-bulan"></select>
+          <select id="filter-tahun"></select>
+        </div>
+        <div class="avatar" id="user-avatar">U</div>
+      </div>
+    </header>
+
+    <div id="notif" class="notif"></div>
+    <div id="loading" class="loading-overlay" style="display:none"><div class="spinner"></div></div>
+
+    <!-- ===== DASHBOARD ===== -->
+    <section id="page-dashboard" class="page">
+      <div class="page-head">
+        <h1>Dashboard</h1>
+        <p>Ringkasan keuangan Anda bulan ini.</p>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi-card kpi-primary">
+          <div class="kpi-top"><span>Total Pemasukan</span><span class="kpi-icon">↑</span></div>
+          <div class="kpi-value" id="kpi-pemasukan">Rp 0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-top"><span>Total Pengeluaran</span><span class="kpi-icon kpi-icon-red">↓</span></div>
+          <div class="kpi-value" id="kpi-pengeluaran">Rp 0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-top"><span>Total Tabungan</span><span class="kpi-icon kpi-icon-green">🐷</span></div>
+          <div class="kpi-value" id="kpi-tabungan">Rp 0</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head">
+            <div><h3>Tren Finansial Tahunan</h3><p>Perbandingan pemasukan, pengeluaran, tabungan</p></div>
+          </div>
+          <canvas id="chart-yearly" height="220"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><h3>Pengeluaran per Kategori</h3><p>Distribusi bulan ini</p></div></div>
+          <canvas id="chart-pie" height="220"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div><h3>Tren Pengeluaran Harian</h3></div>
+          <button id="btn-download-jpg" class="btn-secondary">⬇ Unduh Dashboard JPG</button>
+        </div>
+        <canvas id="chart-daily" height="180"></canvas>
+      </div>
+    </section>
+
+    <!-- ===== CATAT PEMASUKAN ===== -->
+    <section id="page-pemasukan" class="page" style="display:none">
+      <div class="page-head"><h1>Catat Pemasukan</h1><p>Tambah pemasukan baru dan kelola catatan finansial Anda.</p></div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Tambah Pemasukan</h3>
+          <form id="form-pemasukan" class="form-grid">
+            <input type="hidden" id="pemasukan-id">
+            <label>Tanggal<input type="date" id="pemasukan-tanggal" required></label>
+            <label>Sumber Pemasukan<input type="text" id="pemasukan-sumber" placeholder="cth: Gaji Bulanan" required></label>
+            <label>Jumlah Nominal (Rp)<input type="number" id="pemasukan-nominal" min="0" required></label>
+            <label>Catatan (opsional)<textarea id="pemasukan-keterangan" rows="2"></textarea></label>
+            <button type="submit" class="btn-primary btn-block">✓ Simpan Pemasukan</button>
+          </form>
+        </div>
+        <div class="card">
+          <h3>Pemasukan Terakhir</h3>
+          <div id="list-pemasukan" class="list-transaksi"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== ALOKASI DANA ===== -->
+    <section id="page-alokasi" class="page" style="display:none">
+      <div class="page-head"><h1>Alokasi Dana</h1><p>Kelola dan pantau batas pengeluaran kategori bulanan Anda.</p></div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Tambah Alokasi Baru</h3>
+          <form id="form-alokasi" class="form-grid">
+            <label>Nama Kategori<input type="text" id="alokasi-kategori" placeholder="cth: Kebutuhan Rumah" required></label>
+            <label>Jumlah Alokasi (Rp)<input type="number" id="alokasi-nominal" min="0" required></label>
+            <label>Tanggal Efektif<input type="date" id="alokasi-tanggal" required></label>
+            <button type="submit" class="btn-primary btn-block">✓ Simpan Alokasi</button>
+          </form>
+        </div>
+        <div class="card">
+          <h3>Kategori Aktif</h3>
+          <div id="list-alokasi" class="list-alokasi"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== CATAT PENGELUARAN ===== -->
+    <section id="page-pengeluaran" class="page" style="display:none">
+      <div class="page-head"><h1>Catat Pengeluaran</h1><p>Catat dan pantau setiap pengeluaran harian Anda.</p></div>
+      <div class="card">
+        <form id="form-pengeluaran" class="form-grid form-grid-wide">
+          <input type="hidden" id="pengeluaran-id">
+          <label>Kategori<select id="pengeluaran-kategori" required></select></label>
+          <label>Tanggal<input type="date" id="pengeluaran-tanggal" required></label>
+          <label>Jumlah Nominal (Rp)<input type="number" id="pengeluaran-nominal" min="0" required></label>
+          <label>Deskripsi<input type="text" id="pengeluaran-deskripsi" placeholder="cth: Belanja bulanan"></label>
+          <label>Metode Pembayaran
+            <select id="pengeluaran-metode">
+              <option>Cash</option><option>Bank Transfer</option><option>QRIS</option><option>Kartu Debit/Kredit</option>
+            </select>
+          </label>
+          <button type="submit" class="btn-primary">+ Simpan Pengeluaran</button>
+        </form>
+      </div>
+      <div class="card">
+        <h3>Riwayat Pengeluaran</h3>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Tanggal</th><th>Kategori</th><th>Deskripsi</th><th>Metode</th><th>Nominal</th><th>Aksi</th></tr></thead>
+            <tbody id="list-pengeluaran"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TARGET IMPIAN ===== -->
+    <section id="page-target" class="page" style="display:none">
+      <div class="page-head-row">
+        <div><h1>Target Impian</h1><p>Wujudkan barang impian dan masa depan finansial yang terencana.</p></div>
+        <button class="btn-primary" id="btn-open-target-form">+ Target Baru</button>
+      </div>
+      <div class="card" id="card-target-form" style="display:none">
+        <h3>Buat Target Baru</h3>
+        <form id="form-target" class="form-grid">
+          <label>Nama Barang<input type="text" id="target-nama" required></label>
+          <label>Harga Target (Rp)<input type="number" id="target-harga" min="0" required></label>
+          <label>Cicilan per Bulan (Rp)<input type="number" id="target-cicilan" min="0" required></label>
+          <label>Target Selesai<input type="date" id="target-selesai"></label>
+          <label>Keterangan<input type="text" id="target-keterangan"></label>
+          <button type="submit" class="btn-primary btn-block">✓ Simpan Target</button>
+        </form>
+      </div>
+      <div id="list-target" class="target-grid"></div>
+    </section>
+
+    <!-- ===== TABUNGAN ===== -->
+    <section id="page-tabungan" class="page" style="display:none">
+      <div class="page-head-row">
+        <div><h1>Tabungan</h1><p>Pantau akumulasi aset dan riwayat setoran Anda.</p></div>
+        <button class="btn-primary" id="btn-open-tabungan-form">+ Tambah Setoran</button>
+      </div>
+      <div class="card" id="card-tabungan-form" style="display:none">
+        <form id="form-tabungan" class="form-grid">
+          <label>Tanggal<input type="date" id="tabungan-tanggal" required></label>
+          <label>Nominal Setor (Rp)<input type="number" id="tabungan-nominal" min="0" required></label>
+          <label>Keterangan<input type="text" id="tabungan-keterangan"></label>
+          <button type="submit" class="btn-primary btn-block">✓ Simpan Setoran</button>
+        </form>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <p class="eyebrow">SALDO TABUNGAN TOTAL</p>
+          <div class="big-number" id="tabungan-saldo">Rp 0</div>
+        </div>
+        <div class="card">
+          <h3>Tren Tabungan 12 Bulan</h3>
+          <canvas id="chart-tabungan" height="180"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Setoran Terakhir</h3>
+        <div id="list-tabungan" class="list-transaksi"></div>
+      </div>
+    </section>
+
+    <!-- ===== LAPORAN BULANAN ===== -->
+    <section id="page-laporan" class="page" style="display:none">
+      <div class="page-head-row">
+        <div><h1>Laporan Bulanan</h1><p>Rekonsiliasi arus kas, pemasukan, pengeluaran, dan tabungan.</p></div>
+        <button class="btn-primary" id="btn-download-pdf">⬇ Download Laporan PDF</button>
+      </div>
+      <div id="laporan-content">
+        <div class="kpi-row" id="laporan-summary"></div>
+        <div class="card">
+          <h3>I. Pemasukan Bulanan</h3>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>Tanggal</th><th>Sumber</th><th>Keterangan</th><th>Jumlah</th></tr></thead><tbody id="laporan-pemasukan"></tbody></table></div>
+        </div>
+        <div class="card">
+          <h3>II. Pengeluaran</h3>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>Tanggal</th><th>Kategori</th><th>Deskripsi</th><th>Jumlah</th></tr></thead><tbody id="laporan-pengeluaran"></tbody></table></div>
+        </div>
+        <div class="card">
+          <h3>III. Tabungan</h3>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>Tanggal</th><th>Setoran</th><th>Saldo</th><th>Keterangan</th></tr></thead><tbody id="laporan-tabungan"></tbody></table></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
