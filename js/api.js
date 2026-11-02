@@ -2,10 +2,14 @@
 // API HELPERS — komunikasi ke GAS backend (fetch, bukan google.script.run)
 // ============================================================
 
+<<<<<<< HEAD
 // opts.diam = true -> gagal tanpa menampilkan notifikasi merah.
 // Dipakai saat menyegarkan data di belakang layar (lihat js/turbo.js),
 // supaya pemakai tidak dikejutkan toast error padahal layarnya sudah terisi.
 async function fetchData(action, params = {}, opts = {}) {
+=======
+async function fetchData(action, params = {}) {
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
   try {
     const qs = new URLSearchParams({ action, ...params }).toString();
     const res = await fetch(`${GAS_URL}?${qs}`);
@@ -13,7 +17,11 @@ async function fetchData(action, params = {}, opts = {}) {
     if (!json.success) throw new Error(json.message || 'Gagal memuat data.');
     return json.data;
   } catch (err) {
+<<<<<<< HEAD
     if (!opts || !opts.diam) showNotif('Gagal memuat data: ' + err.message, 'error');
+=======
+    showNotif('Gagal memuat data: ' + err.message, 'error');
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
     return null;
   }
 }

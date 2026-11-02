@@ -5,7 +5,11 @@ let currentUser = JSON.parse(localStorage.getItem('ckp_user') || 'null');
 let alokasiCache = [];
 let targetCache = [];
 const $ = id => document.getElementById(id);
+<<<<<<< HEAD
 let chartYearly, chartPie, chartDaily, chartTabungan, chartLaporanPie;
+=======
+let chartYearly, chartPie, chartDaily, chartTabungan;
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
 const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
 // ============================================================
@@ -17,9 +21,12 @@ document.addEventListener('DOMContentLoaded', () => {
   bindNav();
   bindForms();
   if (currentUser) enterApp();
+<<<<<<< HEAD
   // Belum login: bangunkan server Apps Script lebih dulu supaya
   // klik "Masuk" nanti tidak menunggu cold start.
   else warmUpServer();
+=======
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
 });
 
 function populateFilters() {
@@ -120,7 +127,10 @@ function enterApp() {
   document.getElementById('greeting').textContent = `Halo, ${currentUser.nama}! 👋`;
   document.getElementById('user-avatar').textContent = currentUser.nama.charAt(0).toUpperCase();
   navigateTo('dashboard');
+<<<<<<< HEAD
   prefetchData(); // ambil data menu lain saat perangkat santai -> pindah menu terasa instan
+=======
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
 }
 
 // ============================================================
@@ -177,11 +187,18 @@ function refreshCurrentPage() {
 // DASHBOARD
 // ============================================================
 async function loadDashboard() {
+<<<<<<< HEAD
   const { month, year } = getFilterPeriod();
   await muatSatu('getDashboard', { userId: currentUser.userId, month, year }, renderDashboard);
 }
 
 function renderDashboard(data) {
+=======
+  showLoading(true);
+  const { month, year } = getFilterPeriod();
+  const data = await fetchData('getDashboard', { userId: currentUser.userId, month, year });
+  showLoading(false);
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
   if (!data) return;
 
   document.getElementById('kpi-pemasukan').textContent = formatRupiah(data.totalPemasukanBulan);
@@ -196,7 +213,11 @@ function renderDashboard(data) {
 
   const ctxY = document.getElementById('chart-yearly');
   if (chartYearly) chartYearly.destroy();
+<<<<<<< HEAD
   chartYearly = buatChart(ctxY, {
+=======
+  chartYearly = new Chart(ctxY, {
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
     type: 'line',
     data: {
       labels: data.yearlyTrend.map(t => monthNames[t.bulan - 1].slice(0, 3)),
@@ -211,7 +232,11 @@ function renderDashboard(data) {
 
   const ctxP = document.getElementById('chart-pie');
   if (chartPie) chartPie.destroy();
+<<<<<<< HEAD
   chartPie = buatChart(ctxP, {
+=======
+  chartPie = new Chart(ctxP, {
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
     type: 'doughnut',
     data: {
       labels: data.pieByCategory.map(p => p.kategori),
@@ -222,7 +247,11 @@ function renderDashboard(data) {
 
   const ctxD = document.getElementById('chart-daily');
   if (chartDaily) chartDaily.destroy();
+<<<<<<< HEAD
   chartDaily = buatChart(ctxD, {
+=======
+  chartDaily = new Chart(ctxD, {
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
     type: 'line',
     data: { labels: data.dailyTrend.map(d => d.tanggal), datasets: [{ label: 'Pengeluaran Harian', data: data.dailyTrend.map(d => d.total), borderColor: '#00b074', backgroundColor: 'rgba(0,176,116,0.1)', fill: true, tension: .35 }] },
     options: { responsive: true, plugins: { legend: { display: false } } }
@@ -243,12 +272,20 @@ document.getElementById('btn-download-jpg').addEventListener('click', () => {
 // PEMASUKAN
 // ============================================================
 async function loadPemasukan() {
+<<<<<<< HEAD
   await muatSatu('getPemasukan', { userId: currentUser.userId }, renderPemasukan);
 }
 
 function renderPemasukan(data) {
   if (!data) return;
   const sorted = data.slice().sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+=======
+  showLoading(true);
+  const data = await fetchData('getPemasukan', { userId: currentUser.userId });
+  showLoading(false);
+  if (!data) return;
+  const sorted = data.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
   renderPemasukanSummary(sorted);
   const container = document.getElementById('list-pemasukan');
   container.innerHTML = sorted.length ? sorted.map(p => `
@@ -285,6 +322,7 @@ async function deletePemasukan(id) {
 // ============================================================
 // ALOKASI DANA
 // ============================================================
+<<<<<<< HEAD
 // REVISI 3 — pemakaian alokasi dihitung ULANG dari pengeluaran bulan yang
 // sedang dipilih, bukan dari saldo berjalan backend. Dengan begitu setiap
 // ganti bulan, semua kategori otomatis kembali ke 0%.
@@ -330,16 +368,39 @@ function renderAlokasi(data, pengeluaran) {
     <div class="alokasi-item">
       <div class="alokasi-item-top"><strong>${iconKategori(a.kategori)} ${escapeHtml(a.kategori)}</strong>
         <span class="alokasi-right"><span class="persen ${cls}">${persen}%</span>
+=======
+async function loadAlokasi() {
+  showLoading(true);
+  const data = await fetchData('getAlokasi', { userId: currentUser.userId });
+  showLoading(false);
+  if (!data) return;
+  alokasiCache = data;
+  const container = document.getElementById('list-alokasi');
+  container.innerHTML = data.length ? data.map(a => {
+    const persen = a.nominalAlokasi > 0 ? Math.round(((a.nominalAlokasi - a.saldoSaatIni) / a.nominalAlokasi) * 100) : 0;
+    const cls = persen >= 90 ? 'danger' : persen >= 70 ? 'warn' : '';
+    return `
+    <div class="alokasi-item">
+      <div class="alokasi-item-top"><strong>${escapeHtml(a.kategori)}</strong>
+        <span class="alokasi-right"><span>${persen}%</span>
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
           <button class="btn-icon" onclick="editAlokasi('${a.id}')">✏️</button>
           <button class="btn-icon" onclick="deleteAlokasi('${a.id}')">🗑️</button>
         </span>
       </div>
+<<<<<<< HEAD
       <div class="progress-bar"><div class="progress-fill ${cls}" style="width:${Math.min(persen, 100)}%"></div></div>
       <div class="alokasi-meta">
         <span>Terpakai ${formatRupiah(terpakai)} dari ${formatRupiah(budget)}</span>
         ${sisa < 0
           ? `<span class="badge-over">Lebih ${formatRupiah(Math.abs(sisa))}</span>`
           : `<span>Sisa ${formatRupiah(sisa)}</span>`}
+=======
+      <div class="progress-bar"><div class="progress-fill ${cls}" style="width:${Math.min(persen,100)}%"></div></div>
+      <div class="alokasi-meta">
+        <span>${formatRupiah(a.nominalAlokasi - a.saldoSaatIni)} dari ${formatRupiah(a.nominalAlokasi)}</span>
+        <span>Sisa ${formatRupiah(a.saldoSaatIni)}</span>
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
       </div>
     </div>`;
   }).join('') : '<p>Belum ada kategori alokasi.</p>';
@@ -386,6 +447,7 @@ async function deleteAlokasi(id, force = false) {
 // PENGELUARAN
 // ============================================================
 async function loadPengeluaran() {
+<<<<<<< HEAD
   const userId = currentUser.userId;
   await muatSWR(
     [['getAlokasi', { userId }], ['getPengeluaran', { userId }]],
@@ -394,6 +456,14 @@ async function loadPengeluaran() {
 }
 
 function renderPengeluaran(alokasi, data) {
+=======
+  showLoading(true);
+  const [alokasi, data] = await Promise.all([
+    fetchData('getAlokasi', { userId: currentUser.userId }),
+    fetchData('getPengeluaran', { userId: currentUser.userId })
+  ]);
+  showLoading(false);
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
   if (alokasi) {
     alokasiCache = alokasi;
     const sel = document.getElementById('pengeluaran-kategori');
@@ -451,10 +521,16 @@ document.getElementById('btn-open-target-form').addEventListener('click', () => 
 });
 
 async function loadTarget() {
+<<<<<<< HEAD
   await muatSatu('getTarget', { userId: currentUser.userId }, renderTarget);
 }
 
 function renderTarget(data) {
+=======
+  showLoading(true);
+  const data = await fetchData('getTarget', { userId: currentUser.userId });
+  showLoading(false);
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
   if (!data) return;
   targetCache = data;
   const container = document.getElementById('list-target');
@@ -580,18 +656,30 @@ document.getElementById('btn-open-tabungan-form').addEventListener('click', () =
 });
 
 async function loadTabungan() {
+<<<<<<< HEAD
   await muatSatu('getTabungan', { userId: currentUser.userId }, renderTabungan);
 }
 
 function renderTabungan(data) {
   if (!data) return;
   const sorted = data.slice().sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
+=======
+  showLoading(true);
+  const data = await fetchData('getTabungan', { userId: currentUser.userId });
+  showLoading(false);
+  if (!data) return;
+  const sorted = data.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
   const saldoAkhir = sorted.length ? sorted[sorted.length - 1].saldoTotal : 0;
   document.getElementById('tabungan-saldo').textContent = formatRupiah(saldoAkhir);
 
   const ctx = document.getElementById('chart-tabungan');
   if (chartTabungan) chartTabungan.destroy();
+<<<<<<< HEAD
   chartTabungan = buatChart(ctx, {
+=======
+  chartTabungan = new Chart(ctx, {
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
     type: 'line',
     data: { labels: sorted.map(s => formatTanggal(s.tanggal)), datasets: [{ label: 'Saldo Tabungan', data: sorted.map(s => s.saldoTotal), borderColor: '#003228', backgroundColor: 'rgba(0,50,40,0.08)', fill: true, tension: .3 }] },
     options: { responsive: true, plugins: { legend: { display: false } } }
@@ -609,6 +697,7 @@ function renderTabungan(data) {
 // ============================================================
 // LAPORAN BULANAN
 // ============================================================
+<<<<<<< HEAD
 // Palet warna kartu kategori (senada dengan infografis budget bulanan)
 // Sengaja tanpa nuansa merah: merah dipakai khusus untuk penanda jebol budget,
 // supaya kartu sehat tidak terlihat seperti peringatan.
@@ -753,15 +842,42 @@ function renderLaporan(data, alokasi) {
     : '<tr><td colspan="4">Tidak ada data.</td></tr>';
 
   document.getElementById('laporan-tabungan').innerHTML = (data.tabungan || []).length
+=======
+async function loadLaporan() {
+  showLoading(true);
+  const { month, year } = getFilterPeriod();
+  const data = await fetchData('getLaporan', { userId: currentUser.userId, month, year });
+  showLoading(false);
+  if (!data) return;
+
+  document.getElementById('laporan-summary').innerHTML = `
+    <div class="kpi-card"><div class="kpi-top"><span>Total Pemasukan</span></div><div class="kpi-value">${formatRupiah(data.ringkasan.totalPemasukan)}</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span>Total Pengeluaran</span></div><div class="kpi-value">${formatRupiah(data.ringkasan.totalPengeluaran)}</div></div>
+    <div class="kpi-card"><div class="kpi-top"><span>Arus Kas Bersih</span></div><div class="kpi-value">${formatRupiah(data.ringkasan.arusKasBersih)}</div></div>
+  `;
+
+  document.getElementById('laporan-pemasukan').innerHTML = data.pemasukan.length
+    ? data.pemasukan.map(p => `<tr><td>${formatTanggal(p.tanggal)}</td><td>${escapeHtml(p.sumber)}</td><td>${escapeHtml(p.keterangan || '-')}</td><td>${formatRupiah(p.nominal)}</td></tr>`).join('')
+    : '<tr><td colspan="4">Tidak ada data.</td></tr>';
+
+  document.getElementById('laporan-pengeluaran').innerHTML = data.pengeluaran.length
+    ? data.pengeluaran.map(p => `<tr><td>${formatTanggal(p.tanggal)}</td><td>${escapeHtml(p.kategori)}</td><td>${escapeHtml(p.deskripsi || '-')}</td><td>${formatRupiah(p.nominal)}</td></tr>`).join('')
+    : '<tr><td colspan="4">Tidak ada data.</td></tr>';
+
+  document.getElementById('laporan-tabungan').innerHTML = data.tabungan.length
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
     ? data.tabungan.map(s => `<tr><td>${formatTanggal(s.tanggal)}</td><td>${formatRupiah(s.nominalSetor)}</td><td>${formatRupiah(s.saldoTotal)}</td><td>${escapeHtml(s.keterangan || '-')}</td></tr>`).join('')
     : '<tr><td colspan="4">Tidak ada data.</td></tr>';
 }
 
 document.getElementById('btn-download-pdf').addEventListener('click', async () => {
+<<<<<<< HEAD
   if (!window.jspdf || typeof html2canvas === 'undefined') {
     showNotif('Komponen PDF belum selesai dimuat. Coba lagi sebentar lagi.', 'error');
     return;
   }
+=======
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   const { month, year } = getFilterPeriod();
@@ -891,6 +1007,7 @@ function bindForms() {
 // ============================================================
 // UTIL
 // ============================================================
+<<<<<<< HEAD
 // REVISI 3 — Chart.js diambil dari CDN. Bila gagal dimuat (sinyal HP jelek,
 // offline, CDN diblok), pembuatan grafik TIDAK boleh menjatuhkan seluruh
 // halaman: dulu error di sini membuat tabel di bawahnya tidak pernah terisi.
@@ -904,6 +1021,8 @@ function buatChart(canvas, config) {
   }
 }
 
+=======
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str ?? '';
@@ -933,6 +1052,7 @@ function formatWaktu(w) {
 
 function iconKategori(k) {
   const s = String(k || '').toLowerCase();
+<<<<<<< HEAD
   if (/jajan|snack|camilan/.test(s)) return '🍪';
   if (/pokok|sembako|dapur|groceri/.test(s)) return '🛒';
   if (/makan|kuliner|food/.test(s)) return '🍽️';
@@ -948,6 +1068,13 @@ function iconKategori(k) {
   if (/tagihan|utilitas|listrik|air|gas|pdam/.test(s)) return '⚡';
   if (/hibur|rekreasi|lifestyle|liburan|jalan/.test(s)) return '🎬';
   if (/belanja|shop|pakaian|baju/.test(s)) return '🛍️';
+=======
+  if (/makan|kuliner|food/.test(s)) return '🍽️';
+  if (/transport|ojek|bensin/.test(s)) return '🚗';
+  if (/belanja|shop/.test(s)) return '🛍️';
+  if (/tagihan|utilitas|listrik/.test(s)) return '⚡';
+  if (/hibur|rekreasi|lifestyle/.test(s)) return '🎬';
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
   return '🏷️';
 }
 
@@ -1051,6 +1178,7 @@ function renderPengeluaranMobile(list) {
       </div>
     </div>`).join('') : '<p>Belum ada catatan pengeluaran.</p>';
 }
+<<<<<<< HEAD
 
 // ============================================================
 // REVISI 2 — PWA: service worker (caching/kecepatan) + instal ke layar utama
@@ -1104,3 +1232,5 @@ document.getElementById('btn-ios-dismiss').addEventListener('click', () => {
   $('ios-install-tip').style.display = 'none';
   localStorage.setItem('ckp_ios_tip_dismissed', '1');
 });
+=======
+>>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
