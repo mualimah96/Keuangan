@@ -346,7 +346,6 @@ a { text-decoration: none; color: inherit; }
 
   .notif { left: 12px; right: 12px; top: 12px; text-align: center; }
 }
-<<<<<<< HEAD
 
 /* ===== REVISI 2 — PWA INSTALL BANNER ===== */
 .install-banner {
@@ -467,5 +466,3 @@ a { text-decoration: none; color: inherit; }
   .lap-banner-total { text-align: left; }
   .lap-grid { grid-template-columns: 1fr; }
 }
-=======
->>>>>>> 985e157642e7e1a313b98e22a2183099d66284ad
