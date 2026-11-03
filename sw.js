@@ -8,7 +8,7 @@
 
 // Naikkan angka versi ini setiap kali css/js/html direvisi,
 // supaya pengguna lama otomatis dapat versi terbaru.
-const CACHE_VERSION = 'catatankeu-v3';
+const CACHE_VERSION = 'catatankeu-v4';
 
 const APP_SHELL = [
   './',

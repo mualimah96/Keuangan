@@ -767,12 +767,50 @@ document.getElementById('btn-download-pdf').addEventListener('click', async () =
   const { month, year } = getFilterPeriod();
   doc.setFontSize(14); doc.text('Laporan Keuangan Bulanan', 14, 16);
   doc.setFontSize(10); doc.text(`${currentUser.nama} — ${monthNames[month-1]} ${year}`, 14, 23);
-  const canvas = await html2canvas(document.getElementById('laporan-content'), { backgroundColor: '#ffffff', scale: 1.3 });
-  const imgData = canvas.toDataURL('image/jpeg', 0.9);
-  const pageWidth = doc.internal.pageSize.getWidth() - 20;
-  const imgHeight = (canvas.height * pageWidth) / canvas.width;
-  doc.addImage(imgData, 'JPEG', 10, 30, pageWidth, imgHeight);
-  doc.save(`Laporan_${currentUser.nama}_${monthNames[month-1]}_${year}.pdf`);
+  showLoading(true);
+  try {
+    const canvas = await html2canvas(document.getElementById('laporan-content'), { backgroundColor: '#ffffff', scale: 1.3 });
+
+    // REVISI 5 — dulu seluruh laporan ditempel sebagai SATU gambar ke SATU
+    // halaman, sehingga apa pun yang melewati tinggi A4 ikut terpotong.
+    // Sekarang gambarnya dipotong setinggi halaman dan dilanjutkan ke
+    // halaman berikutnya sampai habis.
+    const marginMm  = 10;
+    const atasAwal  = 30;                                   // ruang untuk judul di halaman pertama
+    const lebarMm   = doc.internal.pageSize.getWidth() - marginMm * 2;
+    const tinggiMm  = doc.internal.pageSize.getHeight();
+    const skala     = lebarMm / canvas.width;               // piksel kanvas -> milimeter
+    const tinggiPx1 = (tinggiMm - atasAwal - marginMm) / skala;
+    const tinggiPxN = (tinggiMm - marginMm * 2) / skala;
+
+    let y = 0, pertama = true;
+    while (y < canvas.height) {
+      const sisa = canvas.height - y;
+      const hPx = Math.min(pertama ? tinggiPx1 : tinggiPxN, sisa);
+      if (hPx <= 0) break;
+
+      const potongan = document.createElement('canvas');
+      potongan.width = canvas.width;
+      potongan.height = Math.ceil(hPx);
+      const c = potongan.getContext('2d');
+      c.fillStyle = '#ffffff';                              // JPEG tidak punya transparansi
+      c.fillRect(0, 0, potongan.width, potongan.height);
+      c.drawImage(canvas, 0, y, canvas.width, hPx, 0, 0, canvas.width, hPx);
+
+      if (!pertama) doc.addPage();
+      doc.addImage(potongan.toDataURL('image/jpeg', 0.92), 'JPEG',
+                   marginMm, pertama ? atasAwal : marginMm, lebarMm, hPx * skala);
+
+      y += hPx;
+      pertama = false;
+    }
+
+    doc.save(`Laporan_${currentUser.nama}_${monthNames[month-1]}_${year}.pdf`);
+  } catch (err) {
+    showNotif('Gagal membuat PDF: ' + err.message, 'error');
+  } finally {
+    showLoading(false);
+  }
 });
 
 // ============================================================

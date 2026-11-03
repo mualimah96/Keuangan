@@ -466,3 +466,52 @@ a { text-decoration: none; color: inherit; }
   .lap-banner-total { text-align: left; }
   .lap-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   REVISI 5 — LAPORAN: TATA LETAK KHUSUS LAYAR LEBAR
+   Di HP kartu tetap menumpuk (lihat blok max-width: 900px di atas).
+   Di desktop tiap kategori jadi panel memanjang: ringkasan budget di
+   kiri, daftar belanja mengisi sisa lebar layar di kanan.
+   ============================================================ */
+@media (min-width: 901px) {
+  .lap-grid { grid-template-columns: 1fr; gap: 12px; }
+
+  .lap-cat {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    grid-template-areas:
+      "head   items"
+      "nama   items"
+      "nilai  items"
+      "budget items"
+      "bar    items"
+      "meta   items";
+    grid-template-rows: auto auto auto auto auto 1fr;
+    column-gap: 32px;
+    padding: 18px 22px;
+    border: 1px solid var(--surface-container);
+    border-left: 5px solid var(--c, var(--mint));
+    border-top-width: 1px;
+  }
+  .lap-cat.over { border-color: var(--error); border-left-color: var(--error); }
+
+  .lap-cat-head   { grid-area: head;   margin-bottom: 6px; justify-content: flex-start; gap: 10px; }
+  .lap-cat h4     { grid-area: nama;   font-size: 15px; }
+  .lap-cat-amount { grid-area: nilai;  font-size: 22px; }
+  .lap-cat-budget { grid-area: budget; }
+  .lap-cat .progress-bar { grid-area: bar; align-self: center; }
+  .lap-cat-meta   { grid-area: meta;   margin-top: 6px; }
+
+  /* Daftar belanja: dua kolom, mengisi lebar yang tersisa */
+  .lap-items {
+    grid-area: items; margin: 0; padding: 0; border-top: none;
+    columns: 2; column-gap: 32px;
+  }
+  .lap-items li {
+    break-inside: avoid; font-size: 13px; padding: 6px 0;
+    border-bottom: 1px solid var(--surface-container-low);
+  }
+  .lap-items li span { flex-direction: row; align-items: baseline; gap: 10px; }
+  .lap-items li span em { font-size: 11px; white-space: nowrap; }
+  .lap-kosong { grid-area: items; margin: 0; align-self: center; }
+}
